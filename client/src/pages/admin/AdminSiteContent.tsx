@@ -27,7 +27,6 @@ export default function AdminSiteContent() {
 
   const { data: content = [], isLoading } = useQuery({
     queryKey: ["/api/admin/site-content", activeSection],
-    queryFn: () => apiRequest(`/api/admin/site-content?section=${activeSection}`, { on401: "throw" }),
   });
 
   const updateContentMutation = useMutation({
@@ -36,7 +35,6 @@ export default function AdminSiteContent() {
         method: "PUT",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
-        on401: "throw",
       });
     },
     onSuccess: () => {
@@ -54,7 +52,6 @@ export default function AdminSiteContent() {
         method: "DELETE",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
-        on401: "throw",
       });
     },
     onSuccess: () => {

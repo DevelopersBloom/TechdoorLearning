@@ -17,6 +17,8 @@ import Contact from "@/pages/Contact";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminCourses from "@/pages/admin/AdminCourses";
 import AdminLessons from "@/pages/admin/AdminLessons";
+import AdminSiteContent from "@/pages/admin/AdminSiteContent";
+import { AdminRoute } from "@/components/AdminRoute";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,9 +38,26 @@ function Router() {
       <Route path="/instructors" component={Instructors} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/courses" component={AdminCourses} />
-      <Route path="/admin/lessons" component={AdminLessons} />
+      <Route path="/admin">
+        <AdminRoute>
+          <AdminDashboard />
+        </AdminRoute>
+      </Route>
+      <Route path="/admin/courses">
+        <AdminRoute>
+          <AdminCourses />
+        </AdminRoute>
+      </Route>
+      <Route path="/admin/lessons">
+        <AdminRoute>
+          <AdminLessons />
+        </AdminRoute>
+      </Route>
+      <Route path="/admin/site-content">
+        <AdminRoute>
+          <AdminSiteContent />
+        </AdminRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

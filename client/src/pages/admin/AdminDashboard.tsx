@@ -13,7 +13,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  BarChart3
+  BarChart3,
+  Settings
 } from "lucide-react";
 import type { AdminStats } from "@/lib/types";
 import type { Course } from "@shared/schema";
@@ -280,6 +281,12 @@ export default function AdminDashboard() {
                   <Link href="/admin/lessons">
                     <Video className="mr-2 h-4 w-4" />
                     Add Lesson
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link href="/admin/site-content">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Edit Website Pages
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full justify-start">
