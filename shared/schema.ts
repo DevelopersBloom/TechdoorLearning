@@ -106,6 +106,17 @@ export const lessonProgress = pgTable("lesson_progress", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Site content management
+export const siteContent = pgTable("site_content", {
+  id: serial("id").primaryKey(),
+  section: varchar("section").notNull(), // 'homepage', 'about', 'contact'
+  key: varchar("key").notNull(), // 'title', 'subtitle', 'welcome_text', etc.
+  value: text("value"),
+  type: varchar("type").default("text"), // 'text', 'image', 'json'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertInstructorSchema = createInsertSchema(instructors).omit({ id: true, createdAt: true, updatedAt: true });
@@ -113,6 +124,7 @@ export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, c
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id: true, enrolledAt: true });
 export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSiteContentSchema = createInsertSchema(siteContent).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -127,3 +139,5 @@ export type Enrollment = typeof enrollments.$inferSelect;
 export type InsertEnrollment = z.infer<typeof insertEnrollmentSchema>;
 export type LessonProgress = typeof lessonProgress.$inferSelect;
 export type InsertLessonProgress = z.infer<typeof insertLessonProgressSchema>;
+export type SiteContent = typeof siteContent.$inferSelect;
+export type InsertSiteContent = z.infer<typeof insertSiteContentSchema>;

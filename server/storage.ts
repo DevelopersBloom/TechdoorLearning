@@ -5,6 +5,7 @@ import {
   lessons,
   enrollments,
   lessonProgress,
+  siteContent,
   type User,
   type UpsertUser,
   type Instructor,
@@ -17,6 +18,8 @@ import {
   type InsertEnrollment,
   type LessonProgress,
   type InsertLessonProgress,
+  type SiteContent,
+  type InsertSiteContent,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, sql, ilike } from "drizzle-orm";
@@ -70,6 +73,12 @@ export interface IStorage {
     totalLessons: number;
     avgCompletionRate: number;
   }>;
+  
+  // Site content operations
+  getSiteContent(section?: string): Promise<SiteContent[]>;
+  getSiteContentByKey(section: string, key: string): Promise<SiteContent | undefined>;
+  updateSiteContent(section: string, key: string, value: string, type?: string): Promise<SiteContent>;
+  deleteSiteContent(section: string, key: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
