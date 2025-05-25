@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema } from "@shared/schema";
+import { insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema, insertSiteContentSchema } from "@shared/schema";
 import { z } from "zod";
 
 // Admin middleware
@@ -342,6 +342,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting lesson:", error);
       res.status(500).json({ message: "Failed to delete lesson" });
+    }
+  });
+
+  // Admin - Site Content Management
+  app.get("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { section } = req.query;
+      const content = await storage.getSiteContent(section as string);
+      res.json(content);
+    } catch (error) {
+      console.error("Error fetching site content:", error);
+      res.status(500).json({ message: "Failed to fetch site content" });
+    }
+  });
+
+  app.put("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { section, key, value, type } = req.body;
+      const content = await storage.updateSiteContent(section, key, value, type);
+      res.json(content);
+    } catch (error) {
+      console.error("Error updating site content:", error);
+      res.status(500).json({ message: "Failed to update site content" });
+    }
+  });
+
+  app.delete("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { section, key } = req.body;
+      await storage.deleteSiteContent(section, key);
+      res.json({ message: "Site content deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting site content:", error);
+      res.status(500).json({ message: "Failed to delete site content" });
+    }
+  });
+
+  // Public site content routes
+  app.get("/api/site-content", async (req, res) => {
+    try {
+      const { section } = req.query;
+      const content = await storage.getSiteContent(section as string);
+      res.json(content);
+    } catch (error) {
+      console.error("Error fetching site content:", error);
+      res.status(500).json({ message: "Failed to fetch site content" });
     }
   });
 

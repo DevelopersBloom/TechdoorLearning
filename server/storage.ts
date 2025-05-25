@@ -335,6 +335,44 @@ export class DatabaseStorage implements IStorage {
       avgCompletionRate: completionRate.avg || 0,
     };
   }
+
+  // Site content operations
+  async getSiteContent(section?: string): Promise<SiteContent[]> {
+    if (section) {
+      return await db.select().from(siteContent).where(eq(siteContent.section, section));
+    }
+    return await db.select().from(siteContent);
+  }
+
+  async getSiteContentByKey(section: string, key: string): Promise<SiteContent | undefined> {
+    const [content] = await db.select().from(siteContent)
+      .where(and(eq(siteContent.section, section), eq(siteContent.key, key)));
+    return content;
+  }
+
+  async updateSiteContent(section: string, key: string, value: string, type: string = "text"): Promise<SiteContent> {
+    const existing = await this.getSiteContentByKey(section, key);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(siteContent)
+        .set({ value, type, updatedAt: new Date() })
+        .where(and(eq(siteContent.section, section), eq(siteContent.key, key)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(siteContent)
+        .values({ section, key, value, type })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteSiteContent(section: string, key: string): Promise<void> {
+    await db.delete(siteContent)
+      .where(and(eq(siteContent.section, section), eq(siteContent.key, key)));
+  }
 }
 
 export const storage = new DatabaseStorage();
