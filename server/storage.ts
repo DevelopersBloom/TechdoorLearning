@@ -110,7 +110,7 @@ export class DatabaseStorage implements IStorage {
 
   async isAdmin(userId: string): Promise<boolean> {
     // Admin user check - you can modify this logic as needed
-    const adminEmails = ['admin@techdoor.com'];
+    const adminEmails = ['admin@techdoor.com', 'grigor@developers.bg'];
     const user = await this.getUser(userId);
     return user?.email ? adminEmails.includes(user.email) : false;
   }
