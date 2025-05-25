@@ -71,10 +71,10 @@ export function Navigation() {
             {/* Auth buttons */}
             {isAuthenticated ? (
               <div className="hidden md:flex items-center space-x-3">
-                {user?.isAdmin && (
+                {user?.email === 'admin@techdoor.com' && (
                   <Link href="/admin">
-                    <Button variant="outline" size="sm">
-                      Admin
+                    <Button variant="outline" size="sm" className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300">
+                      Admin Panel
                     </Button>
                   </Link>
                 )}
@@ -95,6 +95,9 @@ export function Navigation() {
                 <Button size="sm" asChild>
                   <a href="/api/login">Sign Up</a>
                 </Button>
+                <Button variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300" asChild>
+                  <a href="/api/login">Admin Login</a>
+                </Button>
               </div>
             )}
 
@@ -111,10 +114,10 @@ export function Navigation() {
                   <div className="border-t pt-4">
                     {isAuthenticated ? (
                       <div className="flex flex-col space-y-2">
-                        {user?.isAdmin && (
+                        {user?.email === 'admin@techdoor.com' && (
                           <Link href="/admin">
-                            <Button variant="outline" size="sm" className="w-full justify-start">
-                              Admin
+                            <Button variant="outline" size="sm" className="w-full justify-start bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300">
+                              Admin Panel
                             </Button>
                           </Link>
                         )}
@@ -134,6 +137,9 @@ export function Navigation() {
                         </Button>
                         <Button size="sm" className="w-full justify-start" asChild>
                           <a href="/api/login">Sign Up</a>
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300" asChild>
+                          <a href="/api/login">Admin Login</a>
                         </Button>
                       </div>
                     )}

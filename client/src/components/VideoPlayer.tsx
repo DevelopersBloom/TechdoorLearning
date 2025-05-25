@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface VideoPlayerProps {
   src: string;
+  videoType?: "upload" | "youtube";
   poster?: string;
   onProgress?: (currentTime: number, duration: number) => void;
   onComplete?: () => void;
@@ -12,8 +13,16 @@ interface VideoPlayerProps {
   className?: string;
 }
 
+// Extract YouTube video ID from URL
+function getYouTubeVideoId(url: string): string | null {
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+
 export function VideoPlayer({ 
   src, 
+  videoType = "upload",
   poster, 
   onProgress, 
   onComplete, 
@@ -27,10 +36,18 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [youtubeId, setYoutubeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (videoType === "youtube") {
+      const id = getYouTubeVideoId(src);
+      setYoutubeId(id);
+    }
+  }, [src, videoType]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || videoType === "youtube") return;
 
     if (initialTime > 0) {
       video.currentTime = initialTime;
@@ -62,7 +79,7 @@ export function VideoPlayer({
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [onProgress, onComplete, initialTime]);
+  }, [onProgress, onComplete, initialTime, videoType]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -117,6 +134,23 @@ export function VideoPlayer({
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  // YouTube embed
+  if (videoType === "youtube" && youtubeId) {
+    return (
+      <div className={cn("relative w-full aspect-video bg-black rounded-lg overflow-hidden", className)}>
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}?start=${Math.floor(initialTime)}&rel=0&modestbranding=1`}
+          title="YouTube video player"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="w-full h-full"
+        />
+      </div>
+    );
+  }
+
+  // Regular video upload
   return (
     <div 
       className={cn("video-player", className)}
