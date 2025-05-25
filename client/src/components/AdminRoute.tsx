@@ -18,7 +18,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
         return;
       }
       
-      if (user && user.email !== 'admin@techdoor.com') {
+      if (user && !user.isAdmin) {
         // Redirect to home if not admin
         setLocation("/");
         return;
@@ -37,8 +37,15 @@ export function AdminRoute({ children }: AdminRouteProps) {
     );
   }
 
-  if (!isAuthenticated || !user || user.email !== 'admin@techdoor.com') {
-    return null; // Will redirect via useEffect
+  if (!isAuthenticated || !user || !user.isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+          <p className="text-muted-foreground">You don't have permission to access the admin dashboard.</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
