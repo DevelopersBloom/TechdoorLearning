@@ -26,6 +26,10 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
+  // Admin operations
+  getUserByEmail(email: string): Promise<User | undefined>;
+  isAdmin(userId: string): Promise<boolean>;
+  
   // Instructor operations
   getInstructors(): Promise<Instructor[]>;
   getInstructor(id: number): Promise<Instructor | undefined>;
@@ -88,6 +92,18 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async isAdmin(userId: string): Promise<boolean> {
+    // Admin user check - you can modify this logic as needed
+    const adminEmails = ['admin@techdoor.com'];
+    const user = await this.getUser(userId);
+    return user?.email ? adminEmails.includes(user.email) : false;
   }
 
   // Instructor operations

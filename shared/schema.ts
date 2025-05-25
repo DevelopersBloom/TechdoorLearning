@@ -74,9 +74,11 @@ export const lessons = pgTable("lessons", {
   title: varchar("title").notNull(),
   description: text("description"),
   videoUrl: varchar("video_url"),
+  videoType: varchar("video_type").default("upload"), // "upload" or "youtube"
   duration: varchar("duration"),
   order: integer("order").notNull(),
   isPreview: boolean("is_preview").default(false),
+  isPublic: boolean("is_public").default(false), // Can be viewed without enrollment
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

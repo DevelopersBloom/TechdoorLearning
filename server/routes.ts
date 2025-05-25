@@ -5,6 +5,27 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema } from "@shared/schema";
 import { z } from "zod";
 
+// Admin middleware
+const isAdmin = async (req: any, res: any, next: any) => {
+  try {
+    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const userId = req.user.claims.sub;
+    const adminCheck = await storage.isAdmin(userId);
+    
+    if (!adminCheck) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Admin check error:", error);
+    res.status(500).json({ message: "Authentication error" });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -52,8 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/courses/:id/lessons", async (req, res) => {
     try {
-      const courseId = parseInt(req.params.id);
-      const lessons = await storage.getLessonsByCourse(courseId);
+      const id = parseInt(req.params.id);
+      const lessons = await storage.getLessonsByCourse(id);
       res.json(lessons);
     } catch (error) {
       console.error("Error fetching lessons:", error);
@@ -61,7 +82,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Instructor routes
   app.get("/api/instructors", async (req, res) => {
     try {
       const instructors = await storage.getInstructors();
@@ -72,7 +92,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Protected enrollment routes
+  // Authenticated routes
+  app.get("/api/enrollments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const enrollments = await storage.getUserEnrollments(userId);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch enrollments" });
+    }
+  });
+
   app.post("/api/enrollments", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -93,36 +124,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid enrollment data", errors: error.errors });
       }
-      console.error("Error enrolling user:", error);
-      res.status(500).json({ message: "Failed to enroll user" });
+      console.error("Error creating enrollment:", error);
+      res.status(500).json({ message: "Failed to enroll in course" });
     }
   });
 
-  app.get("/api/enrollments", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const enrollments = await storage.getUserEnrollments(userId);
-      res.json(enrollments);
-    } catch (error) {
-      console.error("Error fetching enrollments:", error);
-      res.status(500).json({ message: "Failed to fetch enrollments" });
-    }
-  });
-
-  app.get("/api/enrollments/:courseId", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const courseId = parseInt(req.params.courseId);
-      const enrollment = await storage.getUserEnrollment(userId, courseId);
-      res.json(enrollment);
-    } catch (error) {
-      console.error("Error fetching enrollment:", error);
-      res.status(500).json({ message: "Failed to fetch enrollment" });
-    }
-  });
-
-  // Lesson progress routes
-  app.post("/api/lesson-progress", isAuthenticated, async (req: any, res) => {
+  app.put("/api/lesson-progress", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const progressData = insertLessonProgressSchema.parse({
@@ -133,14 +140,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = await storage.updateLessonProgress(progressData);
       
       // Update enrollment progress if lesson is completed
-      if (progressData.isCompleted) {
+      if (progressData.isCompleted && progressData.courseId) {
         const courseId = progressData.courseId;
         const courseLessons = await storage.getLessonsByCourse(courseId);
         const enrollment = await storage.getUserEnrollment(userId, courseId);
         
         if (enrollment) {
           const completedLessons = [...(enrollment.completedLessons || []), progressData.lessonId];
-          const uniqueCompleted = [...new Set(completedLessons)];
+          const uniqueCompleted = [...new Set(completedLessons.filter(id => id != null))] as number[];
           const progressPercentage = (uniqueCompleted.length / courseLessons.length) * 100;
           
           await storage.updateEnrollmentProgress(userId, courseId, progressPercentage, uniqueCompleted);
@@ -169,21 +176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin middleware
-  const isAdmin = async (req: any, res: any, next: any) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      next();
-    } catch (error) {
-      console.error("Error checking admin status:", error);
-      res.status(500).json({ message: "Failed to verify admin status" });
-    }
-  };
-
   // Admin routes
   app.get("/api/admin/stats", isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -195,7 +187,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin course management
+  // Admin - Instructors
+  app.get("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const instructors = await storage.getInstructors();
+      res.json(instructors);
+    } catch (error) {
+      console.error("Error fetching instructors:", error);
+      res.status(500).json({ message: "Failed to fetch instructors" });
+    }
+  });
+
+  app.post("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const instructorData = insertInstructorSchema.parse(req.body);
+      const instructor = await storage.createInstructor(instructorData);
+      res.json(instructor);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid instructor data", errors: error.errors });
+      }
+      console.error("Error creating instructor:", error);
+      res.status(500).json({ message: "Failed to create instructor" });
+    }
+  });
+
+  app.put("/api/admin/instructors/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const instructorData = insertInstructorSchema.partial().parse(req.body);
+      const instructor = await storage.updateInstructor(id, instructorData);
+      res.json(instructor);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid instructor data", errors: error.errors });
+      }
+      console.error("Error updating instructor:", error);
+      res.status(500).json({ message: "Failed to update instructor" });
+    }
+  });
+
+  app.delete("/api/admin/instructors/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteInstructor(id);
+      res.json({ message: "Instructor deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting instructor:", error);
+      res.status(500).json({ message: "Failed to delete instructor" });
+    }
+  });
+
+  // Admin - Courses
   app.get("/api/admin/courses", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { category, search } = req.query;
@@ -205,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(courses);
     } catch (error) {
-      console.error("Error fetching admin courses:", error);
+      console.error("Error fetching courses:", error);
       res.status(500).json({ message: "Failed to fetch courses" });
     }
   });
@@ -250,7 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin lesson management
+  // Admin - Lessons
   app.get("/api/admin/courses/:courseId/lessons", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const courseId = parseInt(req.params.courseId);
@@ -299,46 +342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting lesson:", error);
       res.status(500).json({ message: "Failed to delete lesson" });
-    }
-  });
-
-  // Admin instructor management
-  app.get("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const instructors = await storage.getInstructors();
-      res.json(instructors);
-    } catch (error) {
-      console.error("Error fetching instructors:", error);
-      res.status(500).json({ message: "Failed to fetch instructors" });
-    }
-  });
-
-  app.post("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const instructorData = insertInstructorSchema.parse(req.body);
-      const instructor = await storage.createInstructor(instructorData);
-      res.json(instructor);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid instructor data", errors: error.errors });
-      }
-      console.error("Error creating instructor:", error);
-      res.status(500).json({ message: "Failed to create instructor" });
-    }
-  });
-
-  // Contact form (public)
-  app.post("/api/contact", async (req, res) => {
-    try {
-      const { firstName, lastName, email, subject, message } = req.body;
-      
-      // In a real app, this would send an email or save to database
-      console.log("Contact form submission:", { firstName, lastName, email, subject, message });
-      
-      res.json({ message: "Contact form submitted successfully" });
-    } catch (error) {
-      console.error("Error processing contact form:", error);
-      res.status(500).json({ message: "Failed to submit contact form" });
     }
   });
 
