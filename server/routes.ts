@@ -174,9 +174,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Authenticated routes
-  app.get("/api/enrollments", isAuthenticated, async (req: any, res) => {
+  app.get("/api/enrollments", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
       const enrollments = await storage.getUserEnrollments(userId);
       res.json(enrollments);
     } catch (error) {
