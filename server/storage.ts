@@ -123,6 +123,23 @@ export class DatabaseStorage implements IStorage {
     return user?.isAdmin || false;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
+
+  async promoteToAdmin(userId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ isAdmin: true, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
+  }
+
   // Instructor operations
   async getInstructors(): Promise<Instructor[]> {
     return await db.select().from(instructors).orderBy(asc(instructors.name));

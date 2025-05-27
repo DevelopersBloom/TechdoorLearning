@@ -1,28 +1,27 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Link } from "wouter";
+import { Trash2, UserCheck, ArrowLeft, Calendar, Mail, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Edit, Trash2, Shield, Search, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
 import type { User } from "@shared/schema";
 
 export default function AdminStudents() {
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<User | null>(null);
+  const { toast } = useToast();
 
-  const { data: students = [], isLoading } = useQuery<User[]>({
+  const { data: students = [], isLoading } = useQuery({
     queryKey: ["/api/admin/students"],
   });
 
   const promoteToAdminMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return apiRequest(`/api/admin/students/${userId}/promote`, {
+      return await apiRequest(`/api/admin/students/${userId}/promote`, {
         method: "PUT",
       });
     },
@@ -33,10 +32,10 @@ export default function AdminStudents() {
         description: "Student promoted to admin successfully",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message || "Failed to promote student",
+        description: "Failed to promote student to admin",
         variant: "destructive",
       });
     },
@@ -44,7 +43,7 @@ export default function AdminStudents() {
 
   const deleteStudentMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return apiRequest(`/api/admin/students/${userId}`, {
+      return await apiRequest(`/api/admin/students/${userId}`, {
         method: "DELETE",
       });
     },
@@ -55,14 +54,20 @@ export default function AdminStudents() {
         description: "Student deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete student",
+        description: "Failed to delete student",
         variant: "destructive",
       });
     },
   });
+
+  const filteredStudents = students.filter((student: User) =>
+    student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handlePromoteToAdmin = (userId: string) => {
     if (confirm("Are you sure you want to promote this student to admin?")) {
@@ -71,91 +76,91 @@ export default function AdminStudents() {
   };
 
   const handleDeleteStudent = (userId: string) => {
-    if (confirm("Are you sure you want to delete this student? This cannot be undone.")) {
+    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
       deleteStudentMutation.mutate(userId);
     }
   };
 
-  const filteredStudents = students.filter(student =>
-    student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (student.firstName && student.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (student.lastName && student.lastName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/admin">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Student Management</h1>
+        </div>
+        <div className="text-center py-8">Loading students...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/admin">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold">Student Management</h1>
-          <p className="text-muted-foreground">
-            Manage student accounts and permissions
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Search students..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-            />
-          </div>
         </div>
       </div>
 
-      {filteredStudents.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Users className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No students found</h3>
-            <p className="text-muted-foreground text-center">
-              {searchTerm ? "No students match your search criteria" : "No students have registered yet"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          {filteredStudents.map((student) => (
+      <div className="flex gap-4 mb-6">
+        <Input
+          placeholder="Search students by name or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      <div className="grid gap-4">
+        {filteredStudents.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">
+                {searchTerm ? "No students found matching your search." : "No students found."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredStudents.map((student: User) => (
             <Card key={student.id}>
-              <CardContent className="p-6">
+              <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <Users className="w-6 h-6 text-muted-foreground" />
-                    </div>
+                  <div className="flex items-center gap-4">
                     <div>
-                      <h3 className="font-semibold text-lg">
-                        {student.firstName || student.lastName 
-                          ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
-                          : 'Unknown Name'
-                        }
-                      </h3>
-                      <p className="text-muted-foreground">{student.email}</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        {student.isAdmin ? (
-                          <Badge variant="destructive">
-                            <Shield className="w-3 h-3 mr-1" />
+                      <CardTitle className="flex items-center gap-2">
+                        {student.firstName && student.lastName 
+                          ? `${student.firstName} ${student.lastName}`
+                          : student.email}
+                        {student.isAdmin && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                            <Shield className="h-3 w-3 mr-1" />
                             Admin
                           </Badge>
-                        ) : (
-                          <Badge variant="secondary">Student</Badge>
                         )}
-                        <span className="text-sm text-muted-foreground">
-                          Joined {new Date(student.createdAt).toLocaleDateString()}
-                        </span>
+                      </CardTitle>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-4 w-4" />
+                          {student.email}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          Joined {student.createdAt ? format(new Date(student.createdAt), 'MMM d, yyyy') : 'Unknown'}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex items-center gap-2">
                     {!student.isAdmin && (
                       <Button
                         variant="outline"
@@ -163,34 +168,26 @@ export default function AdminStudents() {
                         onClick={() => handlePromoteToAdmin(student.id)}
                         disabled={promoteToAdminMutation.isPending}
                       >
-                        {promoteToAdminMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Shield className="w-4 h-4 mr-2" />
-                        )}
+                        <UserCheck className="h-4 w-4 mr-2" />
                         Promote to Admin
                       </Button>
                     )}
                     <Button
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
                       onClick={() => handleDeleteStudent(student.id)}
                       disabled={deleteStudentMutation.isPending}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                     >
-                      {deleteStudentMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 mr-2" />
-                      )}
-                      Delete
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-              </CardContent>
+              </CardHeader>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import AdminCourses from "@/pages/admin/AdminCourses";
 import AdminLessons from "@/pages/admin/AdminLessons";
 import AdminSiteContent from "@/pages/admin/AdminSiteContent";
 import AdminInstructors from "@/pages/admin/AdminInstructors";
+import AdminStudents from "@/pages/admin/AdminStudents";
 import { AdminRoute } from "@/components/AdminRoute";
 
 function Router() {
@@ -71,6 +72,11 @@ function Router() {
       <Route path="/admin/instructors">
         <AdminRoute>
           <AdminInstructors />
+        </AdminRoute>
+      </Route>
+      <Route path="/admin/students">
+        <AdminRoute>
+          <AdminStudents />
         </AdminRoute>
       </Route>
       <Route component={NotFound} />
