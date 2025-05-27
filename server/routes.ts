@@ -5,27 +5,6 @@ import { authenticateToken, requireAdmin, hashPassword, comparePassword, generat
 import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema, insertSiteContentSchema } from "@shared/schema";
 import { z } from "zod";
 
-// Admin middleware
-const isAdmin = async (req: any, res: any, next: any) => {
-  try {
-    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    
-    const userId = req.user.claims.sub;
-    const adminCheck = await storage.isAdmin(userId);
-    
-    if (!adminCheck) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    
-    next();
-  } catch (error) {
-    console.error("Admin check error:", error);
-    res.status(500).json({ message: "Authentication error" });
-  }
-};
-
 // Login and signup schemas
 const loginSchema = z.object({
   email: z.string().email(),
@@ -52,21 +31,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await hashPassword(validatedData.password);
       
       // Create user
-      const user = await storage.createUser({
-        ...validatedData,
+      const newUser = await storage.createUser({
+        email: validatedData.email,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
         password: hashedPassword,
+        isAdmin: false,
       });
 
       // Generate token
-      const token = generateToken(user.id);
+      const token = generateToken(newUser.id);
 
       res.status(201).json({
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          isAdmin: user.isAdmin || false,
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          isAdmin: newUser.isAdmin || false,
         },
         token,
       });
@@ -78,16 +60,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/auth/login', async (req, res) => {
     try {
-      const validatedData = loginSchema.parse(req.body);
+      const { email, password } = loginSchema.parse(req.body);
       
       // Find user
-      const user = await storage.getUserByEmail(validatedData.email);
-      if (!user || !user.password) {
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
       // Check password
-      const isPasswordValid = await comparePassword(validatedData.password, user.password);
+      const isPasswordValid = await comparePassword(password, user.password || '');
       if (!isPasswordValid) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
@@ -152,17 +134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/courses/:id/lessons", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const lessons = await storage.getLessonsByCourse(id);
-      res.json(lessons);
-    } catch (error) {
-      console.error("Error fetching lessons:", error);
-      res.status(500).json({ message: "Failed to fetch lessons" });
-    }
-  });
-
   app.get("/api/instructors", async (req, res) => {
     try {
       const instructors = await storage.getInstructors();
@@ -173,14 +144,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Authenticated routes
+  // User enrollment routes (require authentication)
   app.get("/api/enrollments", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
+      if (!req.user?.id) {
         return res.status(401).json({ message: "User not authenticated" });
       }
-      const enrollments = await storage.getUserEnrollments(userId);
+      
+      const enrollments = await storage.getUserEnrollments(req.user.id);
       res.json(enrollments);
     } catch (error) {
       console.error("Error fetching enrollments:", error);
@@ -188,91 +159,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/enrollments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/enrollments", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const enrollmentData = insertEnrollmentSchema.parse({
-        ...req.body,
-        userId,
-      });
+      if (!req.user?.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { courseId } = req.body;
       
       // Check if already enrolled
-      const existing = await storage.getUserEnrollment(userId, enrollmentData.courseId);
-      if (existing) {
+      const existingEnrollment = await storage.getUserEnrollment(req.user.id, courseId);
+      if (existingEnrollment) {
         return res.status(400).json({ message: "Already enrolled in this course" });
       }
-      
-      const enrollment = await storage.enrollUser(enrollmentData);
-      res.json(enrollment);
+
+      const enrollment = await storage.enrollUser({
+        userId: req.user.id,
+        courseId,
+        progress: "0",
+        completedLessons: [],
+        lastAccessedLesson: null,
+      });
+
+      res.status(201).json(enrollment);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid enrollment data", errors: error.errors });
-      }
       console.error("Error creating enrollment:", error);
       res.status(500).json({ message: "Failed to enroll in course" });
     }
   });
 
-  app.put("/api/lesson-progress", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const progressData = insertLessonProgressSchema.parse({
-        ...req.body,
-        userId,
-      });
-      
-      const progress = await storage.updateLessonProgress(progressData);
-      
-      // Update enrollment progress if lesson is completed
-      if (progressData.isCompleted && progressData.courseId) {
-        const courseId = progressData.courseId;
-        const courseLessons = await storage.getLessonsByCourse(courseId);
-        const enrollment = await storage.getUserEnrollment(userId, courseId);
-        
-        if (enrollment) {
-          const completedLessons = [...(enrollment.completedLessons || []), progressData.lessonId];
-          const uniqueCompleted = [...new Set(completedLessons.filter(id => id != null))] as number[];
-          const progressPercentage = (uniqueCompleted.length / courseLessons.length) * 100;
-          
-          await storage.updateEnrollmentProgress(userId, courseId, progressPercentage, uniqueCompleted);
-        }
-      }
-      
-      res.json(progress);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid progress data", errors: error.errors });
-      }
-      console.error("Error updating lesson progress:", error);
-      res.status(500).json({ message: "Failed to update lesson progress" });
-    }
-  });
-
-  app.get("/api/lesson-progress/:lessonId", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const lessonId = parseInt(req.params.lessonId);
-      const progress = await storage.getLessonProgress(userId, lessonId);
-      res.json(progress);
-    } catch (error) {
-      console.error("Error fetching lesson progress:", error);
-      res.status(500).json({ message: "Failed to fetch lesson progress" });
-    }
-  });
-
   // Admin routes
-  app.get("/api/admin/stats", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/courses", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const stats = await storage.getAdminStats();
-      res.json(stats);
+      const courses = await storage.getCourses();
+      res.json(courses);
     } catch (error) {
-      console.error("Error fetching admin stats:", error);
-      res.status(500).json({ message: "Failed to fetch admin stats" });
+      console.error("Error fetching admin courses:", error);
+      res.status(500).json({ message: "Failed to fetch courses" });
     }
   });
 
-  // Admin - Instructors
-  app.get("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/courses", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertCourseSchema.parse(req.body);
+      const course = await storage.createCourse(validatedData);
+      res.status(201).json(course);
+    } catch (error) {
+      console.error("Error creating course:", error);
+      res.status(500).json({ message: "Failed to create course" });
+    }
+  });
+
+  app.put("/api/admin/courses/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertCourseSchema.partial().parse(req.body);
+      const course = await storage.updateCourse(id, validatedData);
+      res.json(course);
+    } catch (error) {
+      console.error("Error updating course:", error);
+      res.status(500).json({ message: "Failed to update course" });
+    }
+  });
+
+  app.delete("/api/admin/courses/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCourse(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      res.status(500).json({ message: "Failed to delete course" });
+    }
+  });
+
+  // Admin lesson routes
+  app.get("/api/admin/lessons", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { courseId } = req.query;
+      if (!courseId) {
+        return res.status(400).json({ message: "Course ID is required" });
+      }
+      const lessons = await storage.getLessonsByCourse(parseInt(courseId as string));
+      res.json(lessons);
+    } catch (error) {
+      console.error("Error fetching lessons:", error);
+      res.status(500).json({ message: "Failed to fetch lessons" });
+    }
+  });
+
+  app.post("/api/admin/lessons", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertLessonSchema.parse(req.body);
+      const lesson = await storage.createLesson(validatedData);
+      res.status(201).json(lesson);
+    } catch (error) {
+      console.error("Error creating lesson:", error);
+      res.status(500).json({ message: "Failed to create lesson" });
+    }
+  });
+
+  app.put("/api/admin/lessons/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertLessonSchema.partial().parse(req.body);
+      const lesson = await storage.updateLesson(id, validatedData);
+      res.json(lesson);
+    } catch (error) {
+      console.error("Error updating lesson:", error);
+      res.status(500).json({ message: "Failed to update lesson" });
+    }
+  });
+
+  app.delete("/api/admin/lessons/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteLesson(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting lesson:", error);
+      res.status(500).json({ message: "Failed to delete lesson" });
+    }
+  });
+
+  // Admin instructor routes
+  app.get("/api/admin/instructors", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const instructors = await storage.getInstructors();
       res.json(instructors);
@@ -282,155 +293,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/instructors", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/instructors", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const instructorData = insertInstructorSchema.parse(req.body);
-      const instructor = await storage.createInstructor(instructorData);
-      res.json(instructor);
+      const validatedData = insertInstructorSchema.parse(req.body);
+      const instructor = await storage.createInstructor(validatedData);
+      res.status(201).json(instructor);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid instructor data", errors: error.errors });
-      }
       console.error("Error creating instructor:", error);
       res.status(500).json({ message: "Failed to create instructor" });
     }
   });
 
-  app.put("/api/admin/instructors/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/instructors/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const instructorData = insertInstructorSchema.partial().parse(req.body);
-      const instructor = await storage.updateInstructor(id, instructorData);
+      const validatedData = insertInstructorSchema.partial().parse(req.body);
+      const instructor = await storage.updateInstructor(id, validatedData);
       res.json(instructor);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid instructor data", errors: error.errors });
-      }
       console.error("Error updating instructor:", error);
       res.status(500).json({ message: "Failed to update instructor" });
     }
   });
 
-  app.delete("/api/admin/instructors/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/instructors/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteInstructor(id);
-      res.json({ message: "Instructor deleted successfully" });
+      res.status(204).send();
     } catch (error) {
       console.error("Error deleting instructor:", error);
       res.status(500).json({ message: "Failed to delete instructor" });
     }
   });
 
-  // Admin - Courses
-  app.get("/api/admin/courses", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const { category, search } = req.query;
-      const courses = await storage.getCourses({
-        category: category as string,
-        search: search as string,
-      });
-      res.json(courses);
-    } catch (error) {
-      console.error("Error fetching courses:", error);
-      res.status(500).json({ message: "Failed to fetch courses" });
-    }
-  });
-
-  app.post("/api/admin/courses", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const courseData = insertCourseSchema.parse(req.body);
-      const course = await storage.createCourse(courseData);
-      res.json(course);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid course data", errors: error.errors });
-      }
-      console.error("Error creating course:", error);
-      res.status(500).json({ message: "Failed to create course" });
-    }
-  });
-
-  app.put("/api/admin/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const courseData = insertCourseSchema.partial().parse(req.body);
-      const course = await storage.updateCourse(id, courseData);
-      res.json(course);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid course data", errors: error.errors });
-      }
-      console.error("Error updating course:", error);
-      res.status(500).json({ message: "Failed to update course" });
-    }
-  });
-
-  app.delete("/api/admin/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.deleteCourse(id);
-      res.json({ message: "Course deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting course:", error);
-      res.status(500).json({ message: "Failed to delete course" });
-    }
-  });
-
-  // Admin - Lessons
-  app.get("/api/admin/courses/:courseId/lessons", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const courseId = parseInt(req.params.courseId);
-      const lessons = await storage.getLessonsByCourse(courseId);
-      res.json(lessons);
-    } catch (error) {
-      console.error("Error fetching lessons:", error);
-      res.status(500).json({ message: "Failed to fetch lessons" });
-    }
-  });
-
-  app.post("/api/admin/lessons", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const lessonData = insertLessonSchema.parse(req.body);
-      const lesson = await storage.createLesson(lessonData);
-      res.json(lesson);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid lesson data", errors: error.errors });
-      }
-      console.error("Error creating lesson:", error);
-      res.status(500).json({ message: "Failed to create lesson" });
-    }
-  });
-
-  app.put("/api/admin/lessons/:id", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const lessonData = insertLessonSchema.partial().parse(req.body);
-      const lesson = await storage.updateLesson(id, lessonData);
-      res.json(lesson);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid lesson data", errors: error.errors });
-      }
-      console.error("Error updating lesson:", error);
-      res.status(500).json({ message: "Failed to update lesson" });
-    }
-  });
-
-  app.delete("/api/admin/lessons/:id", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.deleteLesson(id);
-      res.json({ message: "Lesson deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting lesson:", error);
-      res.status(500).json({ message: "Failed to delete lesson" });
-    }
-  });
-
-  // Admin - Site Content Management
-  app.get("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+  // Admin site content routes
+  app.get("/api/admin/site-content", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { section } = req.query;
       const content = await storage.getSiteContent(section as string);
@@ -441,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/site-content", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { section, key, value, type } = req.body;
       const content = await storage.updateSiteContent(section, key, value, type);
@@ -452,18 +350,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/site-content", isAuthenticated, isAdmin, async (req, res) => {
+  // Admin analytics
+  app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const { section, key } = req.body;
-      await storage.deleteSiteContent(section, key);
-      res.json({ message: "Site content deleted successfully" });
+      const stats = await storage.getAdminStats();
+      res.json(stats);
     } catch (error) {
-      console.error("Error deleting site content:", error);
-      res.status(500).json({ message: "Failed to delete site content" });
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
 
-  // Public site content routes
+  // Contact form
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const { firstName, lastName, email, subject, message } = req.body;
+      
+      // Here you would typically send an email or store the message
+      // For now, we'll just return success
+      console.log("Contact form submission:", { firstName, lastName, email, subject, message });
+      
+      res.json({ message: "Message sent successfully" });
+    } catch (error) {
+      console.error("Error processing contact form:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Site content routes (public)
   app.get("/api/site-content", async (req, res) => {
     try {
       const { section } = req.query;

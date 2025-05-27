@@ -14,7 +14,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
     if (!isLoading) {
       if (!isAuthenticated) {
         // Redirect to login if not authenticated
-        window.location.href = "/api/login";
+        setLocation("/login");
         return;
       }
       
