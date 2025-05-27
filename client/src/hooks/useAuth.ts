@@ -78,6 +78,8 @@ export function useAuth() {
     localStorage.removeItem('authToken');
     queryClient.setQueryData(["/api/auth/user"], null);
     queryClient.clear();
+    // Invalidate all queries after logout
+    queryClient.invalidateQueries();
   };
 
   return {

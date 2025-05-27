@@ -341,7 +341,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/site-content", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const { section, key, value, type } = req.body;
+      const { section, key, value, type = "text" } = req.body;
+      
+      if (!section || !key || value === undefined) {
+        return res.status(400).json({ message: "Section, key, and value are required" });
+      }
+      
       const content = await storage.updateSiteContent(section, key, value, type);
       res.json(content);
     } catch (error) {
