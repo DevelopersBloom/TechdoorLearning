@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { Save, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface SiteContent {
   id: number;
@@ -21,86 +20,96 @@ interface SiteContent {
 }
 
 export default function AdminSiteContent() {
-  const [activeSection, setActiveSection] = useState("homepage");
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: content = [], isLoading } = useQuery({
-    queryKey: ["/api/admin/site-content", activeSection],
+  const { data: content = [], isLoading } = useQuery<SiteContent[]>({
+    queryKey: ["/api/admin/site-content"],
   });
 
   const updateContentMutation = useMutation({
-    mutationFn: async (data: { section: string; key: string; value: string; type?: string }) => {
-      return apiRequest("/api/admin/site-content", {
+    mutationFn: async ({ section, key, value, type }: { section: string; key: string; value: string; type: string }) => {
+      return apiRequest(`/api/admin/site-content`, {
         method: "PUT",
-        body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, key, value, type }),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/site-content"] });
-      toast({ title: "Content updated successfully!" });
+      toast({
+        title: "Success",
+        description: "Content updated successfully",
+      });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update content", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update content",
+        variant: "destructive",
+      });
     },
   });
 
   const deleteContentMutation = useMutation({
-    mutationFn: async (data: { section: string; key: string }) => {
-      return apiRequest("/api/admin/site-content", {
+    mutationFn: async ({ section, key }: { section: string; key: string }) => {
+      return apiRequest(`/api/admin/site-content`, {
         method: "DELETE",
-        body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, key }),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/site-content"] });
-      toast({ title: "Content deleted successfully!" });
+      toast({
+        title: "Success",
+        description: "Content deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error", 
+        description: error.message || "Failed to delete content",
+        variant: "destructive",
+      });
     },
   });
 
-  const getContentValue = (key: string) => {
-    const item = content.find((c: SiteContent) => c.key === key);
+  const getContentValue = (section: string, key: string): string => {
+    const item = content.find((c: SiteContent) => c.section === section && c.key === key);
     return item?.value || "";
   };
 
-  const handleSave = (key: string, value: string, type: string = "text") => {
-    updateContentMutation.mutate({
-      section: activeSection,
-      key,
-      value,
-      type,
-    });
+  const handleSave = (section: string, key: string, value: string, type: string = "text") => {
+    if (!value.trim()) return;
+    updateContentMutation.mutate({ section, key, value, type });
   };
 
-  const handleDelete = (key: string) => {
-    deleteContentMutation.mutate({
-      section: activeSection,
-      key,
-    });
+  const handleDelete = (section: string, key: string) => {
+    deleteContentMutation.mutate({ section, key });
   };
 
   const ContentField = ({ 
     title, 
-    key, 
+    section,
+    contentKey, 
     description, 
     type = "text", 
     multiline = false 
   }: { 
     title: string; 
-    key: string; 
+    section: string;
+    contentKey: string; 
     description: string; 
     type?: string; 
     multiline?: boolean;
   }) => {
-    const [value, setValue] = useState(getContentValue(key));
+    const [value, setValue] = useState(getContentValue(section, contentKey));
 
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {multiline ? (
@@ -119,21 +128,29 @@ export default function AdminSiteContent() {
           )}
           <div className="flex justify-between">
             <Button
-              onClick={() => handleSave(key, value, type)}
+              onClick={() => handleSave(section, contentKey, value, type)}
               disabled={updateContentMutation.isPending}
               size="sm"
             >
-              <Save className="w-4 h-4 mr-2" />
+              {updateContentMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
               Save
             </Button>
             {value && (
               <Button
-                onClick={() => handleDelete(key)}
+                onClick={() => handleDelete(section, contentKey)}
                 disabled={deleteContentMutation.isPending}
                 variant="destructive"
                 size="sm"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                {deleteContentMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
                 Delete
               </Button>
             )}
@@ -145,26 +162,22 @@ export default function AdminSiteContent() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-32 bg-muted rounded"></div>
-          <div className="h-32 bg-muted rounded"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Site Content Management</h1>
         <p className="text-muted-foreground">
-          Edit the content that appears on your website pages
+          Manage content that appears throughout your website
         </p>
       </div>
 
-      <Tabs value={activeSection} onValueChange={setActiveSection}>
+      <Tabs defaultValue="homepage" className="space-y-6">
         <TabsList>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
@@ -176,74 +189,53 @@ export default function AdminSiteContent() {
           <div className="grid gap-6 md:grid-cols-2">
             <ContentField
               title="Main Title"
-              key="main_title"
+              section="homepage"
+              contentKey="main_title"
               description="The main headline on your homepage"
             />
             <ContentField
               title="Subtitle"
-              key="subtitle"
+              section="homepage"
+              contentKey="subtitle"
               description="Supporting text under the main title"
             />
             <ContentField
               title="Welcome Text"
-              key="welcome_text"
+              section="homepage"
+              contentKey="welcome_text"
               description="Introduction text for new visitors"
               multiline
             />
             <ContentField
-              title="Hero Image URL"
-              key="hero_image"
-              description="URL for the main banner image"
-              type="image"
-            />
-            <ContentField
-              title="CTA Button Text"
-              key="cta_text"
-              description="Text for the call-to-action button"
-            />
-            <ContentField
-              title="CTA Button Link"
-              key="cta_link"
-              description="Where the CTA button should link to"
+              title="Hero Button Text"
+              section="homepage"
+              contentKey="hero_button"
+              description="Text for the main call-to-action button"
             />
           </div>
         </TabsContent>
 
         <TabsContent value="about" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6">
+            <ContentField
+              title="About Title"
+              section="about"
+              contentKey="title"
+              description="Main title for the about page"
+            />
+            <ContentField
+              title="About Description"
+              section="about"
+              contentKey="description"
+              description="Main content describing your academy"
+              multiline
+            />
             <ContentField
               title="Mission Statement"
-              key="mission"
-              description="Your organization's mission"
+              section="about"
+              contentKey="mission"
+              description="Your academy's mission and values"
               multiline
-            />
-            <ContentField
-              title="Values"
-              key="values"
-              description="Core values and principles"
-              multiline
-            />
-            <ContentField
-              title="Team Story"
-              key="team_story"
-              description="Story about your team"
-              multiline
-            />
-            <ContentField
-              title="About Image URL"
-              key="about_image"
-              description="URL for the about page image"
-              type="image"
-            />
-            <ContentField
-              title="Founded Year"
-              key="founded_year"
-              description="When was the organization founded?"
-            />
-            <ContentField
-              title="Team Size"
-              key="team_size"
-              description="Number of team members"
             />
           </div>
         </TabsContent>
@@ -251,59 +243,47 @@ export default function AdminSiteContent() {
         <TabsContent value="contact" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <ContentField
-              title="Office Address"
-              key="address"
-              description="Physical office address"
-              multiline
-            />
-            <ContentField
-              title="Email Address"
-              key="email"
-              description="Contact email address"
+              title="Contact Title"
+              section="contact"
+              contentKey="title"
+              description="Title for the contact page"
             />
             <ContentField
               title="Phone Number"
-              key="phone"
-              description="Contact phone number"
+              section="contact"
+              contentKey="phone"
+              description="Primary contact phone number"
             />
             <ContentField
-              title="Business Hours"
-              key="hours"
-              description="When you're available"
+              title="Email Address"
+              section="contact"
+              contentKey="email"
+              description="Primary contact email"
+            />
+            <ContentField
+              title="Office Address"
+              section="contact"
+              contentKey="address"
+              description="Physical office address"
               multiline
-            />
-            <ContentField
-              title="Contact Hero Image"
-              key="contact_image"
-              description="URL for contact page image"
-              type="image"
             />
           </div>
         </TabsContent>
 
         <TabsContent value="instructors" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6">
             <ContentField
               title="Instructors Page Title"
-              key="page_title"
-              description="Title for the instructors page"
+              section="instructors"
+              contentKey="title"
+              description="Main title for the instructors page"
             />
             <ContentField
-              title="Page Description"
-              key="page_description"
-              description="Description for the instructors page"
+              title="Instructors Description"
+              section="instructors"
+              contentKey="description"
+              description="Introduction text about your instructors"
               multiline
-            />
-            <ContentField
-              title="Join Our Team Text"
-              key="join_team_text"
-              description="Text encouraging instructors to apply"
-              multiline
-            />
-            <ContentField
-              title="Instructor Application Email"
-              key="application_email"
-              description="Email for instructor applications"
             />
           </div>
         </TabsContent>
