@@ -22,14 +22,15 @@ export default function AdminInstructors() {
     queryKey: ["/api/admin/instructors"],
   });
 
-  const form = useForm<InsertInstructor>({
-    resolver: zodResolver(insertInstructorSchema),
+  const form = useForm({
     defaultValues: {
       name: "",
       title: "",
       bio: "",
       profileImageUrl: "",
       expertise: "",
+      rating: "",
+      studentCount: 0,
     },
   });
 
@@ -108,11 +109,21 @@ export default function AdminInstructors() {
     },
   });
 
-  const handleSubmit = (data: InsertInstructor) => {
-    // Convert expertise string to array
+  const handleSubmit = (data: any) => {
+    // Convert expertise string to array (handle comma-separated values)
+    let expertiseArray: string[] = [];
+    if (data.expertise) {
+      if (typeof data.expertise === 'string') {
+        // Split by comma and trim whitespace
+        expertiseArray = data.expertise.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+      } else if (Array.isArray(data.expertise)) {
+        expertiseArray = data.expertise;
+      }
+    }
+    
     const processedData = {
       ...data,
-      expertise: data.expertise ? [data.expertise] : []
+      expertise: expertiseArray
     };
     
     if (editingInstructor) {
@@ -126,9 +137,12 @@ export default function AdminInstructors() {
     setEditingInstructor(instructor);
     form.reset({
       name: instructor.name,
+      title: instructor.title,
       bio: instructor.bio || "",
-      photoUrl: instructor.photoUrl || "",
-      expertise: instructor.expertise || "",
+      profileImageUrl: instructor.profileImageUrl || "",
+      expertise: Array.isArray(instructor.expertise) ? instructor.expertise.join(", ") : (instructor.expertise || ""),
+      rating: instructor.rating || "",
+      studentCount: instructor.studentCount || 0,
     });
     setIsDialogOpen(true);
   };
