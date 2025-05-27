@@ -1,0 +1,47 @@
+The Add New Instructor form is broken.
+
+I see this error:
+**"Expected array, received string"** under the Expertise field.
+
+Please fix the form so that:
+The expertise input is sent as an array, even if the user enters just one value (e.g., `["Design"]`)
+Optionally allow adding multiple expertise values via comma-separated input or multi-tag field
+The backend should accept an array of strings for the expertise field
+Fix validation and show proper success/error messages
+
+Also make sure the instructor is saved in the database and shown in the instructors list after saving.
+
+Please test this end-to-end.
+The Admin Dashboard is incomplete. I can’t access or manage any of the data shown in the cards (students, courses, lessons, etc.). Please do the following:
+
+---
+
+👤 STUDENT MANAGEMENT
+- I see “Total Students: 3” but cannot click or view them.
+- Create a section or page for:
+  - Viewing all student profiles (email, enrolled courses, progress)
+  - Editing or deleting a student
+  - Assigning/removing courses
+  - Optional: promoting a student to admin
+
+---
+
+📘 COURSE & LESSON DATA
+- Even though the dashboard shows “Recent Activity” like “Python Data Science course updated,” those courses don’t exist in the system.
+- Ensure activity log only shows real actions from the database.
+- “Total Courses” and “Total Lessons” should reflect actual data saved, not dummy counters.
+
+---
+
+⚙️ DASHBOARD LINKS
+- Make the “Total Students”, “Total Courses”, and “Total Lessons” boxes **clickable**, leading to full pages.
+- Each page should list the records with sorting, search, and actions (edit/delete/view).
+- Add missing routes if needed (`/admin/students`, `/admin/courses`, `/admin/lessons`).
+
+---
+
+🔐 ACCESS CONTROL
+- These tools should only be visible to admins.
+- Protect all related routes and pages with proper `is_admin` checks.
+
+Please test everything end-to-end and confirm that I can view/edit/manage students, courses, and lessons directly from the dashboard.

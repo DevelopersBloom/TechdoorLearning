@@ -366,6 +366,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Student management routes
+  app.get("/api/admin/students", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const students = await storage.getAllUsers();
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.put("/api/admin/students/:id/promote", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.promoteToAdmin(id);
+      res.json(user);
+    } catch (error) {
+      console.error("Error promoting student:", error);
+      res.status(500).json({ message: "Failed to promote student" });
+    }
+  });
+
+  app.delete("/api/admin/students/:id", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteUser(id);
+      res.json({ message: "Student deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      res.status(500).json({ message: "Failed to delete student" });
+    }
+  });
+
   // Contact form
   app.post("/api/contact", async (req, res) => {
     try {

@@ -34,6 +34,9 @@ export interface IStorage {
   
   // Admin operations
   isAdmin(userId: string): Promise<boolean>;
+  getAllUsers(): Promise<User[]>;
+  promoteToAdmin(userId: string): Promise<User>;
+  deleteUser(userId: string): Promise<void>;
   
   // Instructor operations
   getInstructors(): Promise<Instructor[]>;

@@ -29,7 +29,7 @@ export default function AdminInstructors() {
       title: "",
       bio: "",
       profileImageUrl: "",
-      expertise: [],
+      expertise: "",
     },
   });
 
@@ -109,10 +109,16 @@ export default function AdminInstructors() {
   });
 
   const handleSubmit = (data: InsertInstructor) => {
+    // Convert expertise string to array
+    const processedData = {
+      ...data,
+      expertise: data.expertise ? [data.expertise] : []
+    };
+    
     if (editingInstructor) {
-      updateInstructorMutation.mutate({ id: editingInstructor.id, data });
+      updateInstructorMutation.mutate({ id: editingInstructor.id, data: processedData });
     } else {
-      createInstructorMutation.mutate(data);
+      createInstructorMutation.mutate(processedData);
     }
   };
 
