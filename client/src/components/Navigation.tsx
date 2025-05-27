@@ -87,13 +87,13 @@ export function Navigation() {
             ) : (
               <div className="hidden md:flex items-center space-x-3">
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    Login
+                  <Button variant="ghost" size="sm" asChild>
+                    <a>Login</a>
                   </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button size="sm">
-                    Sign Up
+                  <Button size="sm" asChild>
+                    <a>Sign Up</a>
                   </Button>
                 </Link>
               </div>
@@ -129,13 +129,13 @@ export function Navigation() {
                     ) : (
                       <div className="flex flex-col space-y-2">
                         <Link href="/login">
-                          <Button variant="ghost" size="sm" className="w-full justify-start">
-                            Login
+                          <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                            <a>Login</a>
                           </Button>
                         </Link>
                         <Link href="/signup">
-                          <Button size="sm" className="w-full justify-start">
-                            Sign Up
+                          <Button size="sm" className="w-full justify-start" asChild>
+                            <a>Sign Up</a>
                           </Button>
                         </Link>
                       </div>
