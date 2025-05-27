@@ -8,6 +8,8 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import Home from "@/pages/Home";
 import Courses from "@/pages/Courses";
 import CourseDetail from "@/pages/CourseDetail";
@@ -25,6 +27,11 @@ function Router() {
 
   return (
     <Switch>
+      {/* Authentication routes */}
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+      
+      {/* Main routes */}
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (
@@ -38,6 +45,8 @@ function Router() {
       <Route path="/instructors" component={Instructors} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
+      
+      {/* Admin routes */}
       <Route path="/admin">
         <AdminRoute>
           <AdminDashboard />

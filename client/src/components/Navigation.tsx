@@ -6,7 +6,7 @@ import { Moon, Sun, GraduationCap, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function Navigation() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
 
@@ -76,18 +76,26 @@ export function Navigation() {
                     Dashboard
                   </Button>
                 </Link>
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/api/logout">Logout</a>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={logout}
+                >
+                  Logout
                 </Button>
               </div>
             ) : (
               <div className="hidden md:flex items-center space-x-3">
-                <Button variant="ghost" size="sm" asChild>
-                  <a href="/api/login">Login</a>
-                </Button>
-                <Button size="sm" asChild>
-                  <a href="/api/login">Sign Up</a>
-                </Button>
+                <Link href="/login">
+                  <Button variant="ghost" size="sm">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm">
+                    Sign Up
+                  </Button>
+                </Link>
               </div>
             )}
 
@@ -109,18 +117,27 @@ export function Navigation() {
                             Dashboard
                           </Button>
                         </Link>
-                        <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                          <a href="/api/logout">Logout</a>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full justify-start"
+                          onClick={logout}
+                        >
+                          Logout
                         </Button>
                       </div>
                     ) : (
                       <div className="flex flex-col space-y-2">
-                        <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
-                          <a href="/api/login">Login</a>
-                        </Button>
-                        <Button size="sm" className="w-full justify-start" asChild>
-                          <a href="/api/login">Sign Up</a>
-                        </Button>
+                        <Link href="/login">
+                          <Button variant="ghost" size="sm" className="w-full justify-start">
+                            Login
+                          </Button>
+                        </Link>
+                        <Link href="/signup">
+                          <Button size="sm" className="w-full justify-start">
+                            Sign Up
+                          </Button>
+                        </Link>
                       </div>
                     )}
                   </div>
