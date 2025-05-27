@@ -86,7 +86,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, parseInt(id)));
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
@@ -96,9 +96,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(userData: InsertUser): Promise<User> {
+    // Generate a unique ID for new users
+    const userId = Date.now().toString();
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({ ...userData, id: userId })
       .returning();
     return user;
   }
@@ -107,7 +109,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ ...userData, updatedAt: new Date() })
-      .where(eq(users.id, id))
+      .where(eq(users.id, id.toString()))
       .returning();
     return user;
   }

@@ -24,11 +24,11 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for custom authentication
+// User storage table - maintaining compatibility with existing data
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  email: varchar("email").unique().notNull(),
-  password: varchar("password").notNull(),
+  id: varchar("id").primaryKey().notNull(),
+  email: varchar("email").unique(),
+  password: varchar("password"), // Optional for migration compatibility
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),

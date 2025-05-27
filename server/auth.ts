@@ -8,7 +8,7 @@ const JWT_EXPIRES_IN = '7d';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    id: number;
+    id: string;
     email: string;
     firstName?: string;
     lastName?: string;
@@ -24,13 +24,13 @@ export const comparePassword = async (password: string, hashedPassword: string):
   return bcrypt.compare(password, hashedPassword);
 };
 
-export const generateToken = (userId: number): string => {
+export const generateToken = (userId: string): string => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
-export const verifyToken = (token: string): { userId: number } | null => {
+export const verifyToken = (token: string): { userId: string } | null => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
     return decoded;
   } catch (error) {
     return null;

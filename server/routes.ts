@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema, insertSiteContentSchema } from "@shared/schema";
+import { authenticateToken, requireAdmin, hashPassword, comparePassword, generateToken, type AuthenticatedRequest } from "./auth";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertInstructorSchema, insertEnrollmentSchema, insertLessonProgressSchema, insertSiteContentSchema } from "@shared/schema";
 import { z } from "zod";
 
 // Admin middleware
@@ -26,16 +26,97 @@ const isAdmin = async (req: any, res: any, next: any) => {
   }
 };
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+// Login and signup schemas
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+const signupSchema = insertUserSchema.extend({
+  password: z.string().min(6),
+});
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication routes
+  app.post('/api/auth/signup', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const validatedData = signupSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: 'User already exists' });
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(validatedData.password);
+      
+      // Create user
+      const user = await storage.createUser({
+        ...validatedData,
+        password: hashedPassword,
+      });
+
+      // Generate token
+      const token = generateToken(user.id);
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isAdmin: user.isAdmin || false,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      res.status(400).json({ message: error.message || 'Signup failed' });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const validatedData = loginSchema.parse(req.body);
+      
+      // Find user
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Check password
+      const isPasswordValid = await comparePassword(validatedData.password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Generate token
+      const token = generateToken(user.id);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isAdmin: user.isAdmin || false,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(400).json({ message: error.message || 'Login failed' });
+    }
+  });
+
+  app.get('/api/auth/user', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
