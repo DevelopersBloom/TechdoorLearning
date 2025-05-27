@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,7 +103,12 @@ export default function AdminSiteContent() {
     type?: string; 
     multiline?: boolean;
   }) => {
-    const [value, setValue] = useState(getContentValue(section, contentKey));
+    const [value, setValue] = useState(() => getContentValue(section, contentKey));
+    
+    // Update local state when content changes from the server
+    useEffect(() => {
+      setValue(getContentValue(section, contentKey));
+    }, [content, section, contentKey]);
 
     return (
       <Card>

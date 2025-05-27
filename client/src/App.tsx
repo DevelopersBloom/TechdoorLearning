@@ -20,6 +20,7 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminCourses from "@/pages/admin/AdminCourses";
 import AdminLessons from "@/pages/admin/AdminLessons";
 import AdminSiteContent from "@/pages/admin/AdminSiteContent";
+import AdminInstructors from "@/pages/admin/AdminInstructors";
 import { AdminRoute } from "@/components/AdminRoute";
 
 function Router() {
@@ -65,6 +66,11 @@ function Router() {
       <Route path="/admin/site-content">
         <AdminRoute>
           <AdminSiteContent />
+        </AdminRoute>
+      </Route>
+      <Route path="/admin/instructors">
+        <AdminRoute>
+          <AdminInstructors />
         </AdminRoute>
       </Route>
       <Route component={NotFound} />
